@@ -4,9 +4,11 @@ import { Notice } from 'obsidian';
 import type VMemoPlugin from '../main';
 import { VoxmlxInstaller } from './VoxmlxInstaller';
 import { TranscriptionResult } from '../types';
-import { TRANSCRIPTION_CONFIG } from '../constants';
 
 const execAsync = promisify(exec);
+
+const HOME = process.env.HOME || `/Users/${process.env.USER}`;
+const EXTENDED_PATH = `/opt/homebrew/bin:/usr/local/bin:${HOME}/.local/bin:/usr/bin:/bin`;
 
 export class TranscriptionService {
   private plugin: VMemoPlugin;
@@ -61,13 +63,14 @@ export class TranscriptionService {
   }
 
   private async runVoxmlx(audioPath: string): Promise<VoxmlxOutput> {
-    const voxmlxPath = this.plugin.settings.voxmlxPath || TRANSCRIPTION_CONFIG.voxmlxCommand;
+    const voxmlxPath = await this.installer.findVoxmlxPath();
     const command = `${voxmlxPath} --audio "${audioPath}"`;
 
     try {
       const { stdout, stderr } = await execAsync(command, {
-        timeout: 600000, // 10 minute timeout
-        maxBuffer: 50 * 1024 * 1024, // 50MB buffer
+        timeout: 600000,
+        maxBuffer: 50 * 1024 * 1024,
+        env: { ...process.env, PATH: EXTENDED_PATH },
       });
 
       if (stderr && !stderr.includes('Loading') && !stderr.includes('Processing')) {

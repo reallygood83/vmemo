@@ -6,6 +6,9 @@ import { TRANSCRIPTION_CONFIG, ERROR_MESSAGES } from '../constants';
 
 const execAsync = promisify(exec);
 
+const HOME = process.env.HOME || `/Users/${process.env.USER}`;
+const EXTENDED_PATH = `/opt/homebrew/bin:/usr/local/bin:${HOME}/.local/bin:/usr/bin:/bin`;
+
 export class VoxmlxInstaller {
   private plugin: VMemoPlugin;
 
@@ -13,14 +16,30 @@ export class VoxmlxInstaller {
     this.plugin = plugin;
   }
 
+  private getExecOptions(timeout = 60000) {
+    return {
+      timeout,
+      env: { ...process.env, PATH: EXTENDED_PATH },
+    };
+  }
+
   async checkInstallation(): Promise<boolean> {
-    try {
-      const voxmlxPath = this.plugin.settings.voxmlxPath || TRANSCRIPTION_CONFIG.voxmlxCommand;
-      await execAsync(`${voxmlxPath} --help`);
-      return true;
-    } catch {
-      return false;
+    const pathsToTry = [
+      this.plugin.settings.voxmlxPath,
+      'voxmlx',
+      `${HOME}/.local/bin/voxmlx`,
+      '/opt/homebrew/bin/voxmlx',
+    ].filter(Boolean);
+
+    for (const path of pathsToTry) {
+      try {
+        await execAsync(`${path} --help`, this.getExecOptions());
+        return true;
+      } catch {
+        continue;
+      }
     }
+    return false;
   }
 
   async install(): Promise<void> {
@@ -48,7 +67,7 @@ export class VoxmlxInstaller {
     
     for (const pythonPath of pythonPaths) {
       try {
-        const { stdout } = await execAsync(`${pythonPath} --version`);
+        const { stdout } = await execAsync(`${pythonPath} --version`, this.getExecOptions());
         const version = stdout.match(/Python (\d+)\.(\d+)/);
         
         if (version) {
@@ -80,7 +99,7 @@ export class VoxmlxInstaller {
     for (const cmd of installCommands) {
       try {
         console.log('VMemo: Trying install command:', cmd);
-        await execAsync(cmd, { timeout: 300000 });
+        await execAsync(cmd, this.getExecOptions(300000));
         
         await new Promise(resolve => setTimeout(resolve, 1000));
         
@@ -100,12 +119,26 @@ export class VoxmlxInstaller {
   }
 
   async getVersion(): Promise<string | null> {
-    try {
-      const voxmlxPath = this.plugin.settings.voxmlxPath || TRANSCRIPTION_CONFIG.voxmlxCommand;
-      await execAsync(`${voxmlxPath} --help`);
-      return 'installed';
-    } catch {
-      return null;
+    const isInstalled = await this.checkInstallation();
+    return isInstalled ? 'installed' : null;
+  }
+
+  async findVoxmlxPath(): Promise<string> {
+    const pathsToTry = [
+      this.plugin.settings.voxmlxPath,
+      `${HOME}/.local/bin/voxmlx`,
+      '/opt/homebrew/bin/voxmlx',
+      'voxmlx',
+    ].filter(Boolean);
+
+    for (const path of pathsToTry) {
+      try {
+        await execAsync(`${path} --help`, this.getExecOptions());
+        return path as string;
+      } catch {
+        continue;
+      }
     }
+    throw new Error('voxmlx not found');
   }
 }
