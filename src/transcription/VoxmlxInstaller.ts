@@ -27,8 +27,8 @@ export class VoxmlxInstaller {
     new Notice('Installing voxmlx... This may take a few minutes.');
 
     try {
-      await this.checkPython();
-      await this.installVoxmlx();
+      const pythonPath = await this.findPython();
+      await this.installVoxmlx(pythonPath);
       new Notice('voxmlx installed successfully!');
     } catch (error) {
       const message = error instanceof Error ? error.message : ERROR_MESSAGES.voxmlxInstallFailed;
@@ -37,12 +37,18 @@ export class VoxmlxInstaller {
     }
   }
 
-  private async checkPython(): Promise<void> {
-    const pythonCommands = ['python3.11', 'python3', 'python'];
+  private async findPython(): Promise<string> {
+    const pythonPaths = [
+      '/opt/homebrew/bin/python3',
+      '/usr/local/bin/python3',
+      '/usr/bin/python3',
+      'python3',
+      'python',
+    ];
     
-    for (const cmd of pythonCommands) {
+    for (const pythonPath of pythonPaths) {
       try {
-        const { stdout } = await execAsync(`${cmd} --version`);
+        const { stdout } = await execAsync(`${pythonPath} --version`);
         const version = stdout.match(/Python (\d+)\.(\d+)/);
         
         if (version) {
@@ -50,7 +56,7 @@ export class VoxmlxInstaller {
           const minor = parseInt(version[2]);
           
           if (major >= 3 && minor >= 8) {
-            return;
+            return pythonPath;
           }
         }
       } catch {
@@ -61,31 +67,36 @@ export class VoxmlxInstaller {
     throw new Error('Python 3.8+ is required. Please install Python from python.org');
   }
 
-  private async installVoxmlx(): Promise<void> {
+  private async installVoxmlx(pythonPath: string): Promise<void> {
     const installCommands = [
-      'pipx install voxmlx --python python3.11',
-      'pipx install voxmlx --python python3',
-      'pip3 install voxmlx',
-      'pip install voxmlx',
+      `${pythonPath} -m pip install voxmlx --user`,
+      `${pythonPath} -m pip install voxmlx`,
+      '/opt/homebrew/bin/pip3 install voxmlx',
+      '/usr/local/bin/pip3 install voxmlx',
     ];
 
     let lastError: Error | null = null;
 
     for (const cmd of installCommands) {
       try {
+        console.log('VMemo: Trying install command:', cmd);
         await execAsync(cmd, { timeout: 300000 });
+        
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
         const isNowInstalled = await this.checkInstallation();
         if (isNowInstalled) {
+          console.log('VMemo: voxmlx installed successfully');
           return;
         }
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
+        console.log('VMemo: Install command failed:', cmd, lastError.message);
         continue;
       }
     }
 
-    throw lastError || new Error(ERROR_MESSAGES.voxmlxInstallFailed);
+    throw new Error(`Failed to install voxmlx. Please run manually:\n${installCommands[0]}`);
   }
 
   async getVersion(): Promise<string | null> {

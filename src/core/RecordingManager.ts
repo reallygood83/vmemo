@@ -51,13 +51,10 @@ export class RecordingManager {
       startTime: Date.now(),
     };
 
-    this.modal = new ProcessingModal(this.plugin.app);
-    this.modal.onStopRecording = () => this.stopRecording();
-    this.modal.open();
-    this.modal.startRecording();
-
     this.startTimer();
     this.plugin.ribbonIcon.setRecording(true);
+    this.plugin.statusBar.updateStatus('🔴 Recording...');
+    this.plugin.notify('Recording started - click mic icon to stop');
   }
 
   async stopRecording(): Promise<void> {
@@ -69,9 +66,9 @@ export class RecordingManager {
     this.plugin.ribbonIcon.setRecording(false);
     this.plugin.statusBar.hide();
 
-    if (this.modal) {
-      this.modal.setStage('saving', 'Saving audio file...');
-    }
+    this.modal = new ProcessingModal(this.plugin.app);
+    this.modal.open();
+    this.modal.setStage('saving', 'Saving audio file...');
 
     const audioBlob = await this.recorder.stop();
     this.state.audioBlob = audioBlob;
