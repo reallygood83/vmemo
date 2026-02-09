@@ -28,6 +28,147 @@
   color: var(--text-error);
 }
 
+.vmemo-processing-modal {
+  padding: 0;
+}
+
+.vmemo-modal-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 48px;
+  text-align: center;
+  min-width: 320px;
+}
+
+.vmemo-modal-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  line-height: 1;
+}
+
+.vmemo-modal-icon.recording {
+  animation: vmemo-pulse 1s ease-in-out infinite;
+}
+
+.vmemo-modal-icon.transcribing,
+.vmemo-modal-icon.formatting,
+.vmemo-modal-icon.saving {
+  animation: vmemo-bounce 1s ease-in-out infinite;
+}
+
+.vmemo-modal-icon.complete {
+  color: var(--text-success);
+}
+
+.vmemo-modal-icon.error {
+  color: var(--text-error);
+}
+
+@keyframes vmemo-bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.vmemo-modal-title {
+  font-size: 1.5em;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: var(--text-normal);
+}
+
+.vmemo-modal-timer {
+  font-size: 2.5em;
+  font-weight: 700;
+  font-family: var(--font-monospace);
+  color: var(--text-accent);
+  margin-bottom: 16px;
+}
+
+.vmemo-modal-message {
+  font-size: 1em;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+  max-width: 280px;
+}
+
+.vmemo-modal-progress {
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+.vmemo-progress-bar {
+  height: 6px;
+  background: var(--background-modifier-border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.vmemo-progress-bar-fill {
+  height: 100%;
+  background: var(--interactive-accent);
+  border-radius: 3px;
+}
+
+.vmemo-progress-bar-fill.vmemo-progress-animated {
+  width: 30%;
+  animation: vmemo-progress-indeterminate 1.5s ease-in-out infinite;
+}
+
+@keyframes vmemo-progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+.vmemo-modal-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.vmemo-btn {
+  padding: 10px 24px;
+  border-radius: 6px;
+  font-size: 1em;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+}
+
+.vmemo-btn:hover {
+  background: var(--interactive-hover);
+}
+
+.vmemo-btn-danger {
+  background: var(--text-error);
+  color: white;
+}
+
+.vmemo-btn-danger:hover {
+  background: var(--text-error);
+  opacity: 0.9;
+}
+
+.vmemo-btn-primary {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.vmemo-btn-primary:hover {
+  background: var(--interactive-accent-hover);
+}
+
 .vmemo-settings h1 {
   margin-bottom: 24px;
 }
@@ -44,43 +185,6 @@
   margin-bottom: 12px;
   font-size: 0.95em;
   color: var(--text-muted);
-}
-
-.vmemo-modal {
-  max-width: 600px;
-}
-
-.vmemo-modal .modal-content {
-  padding: 20px;
-}
-
-.vmemo-progress-container {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 16px;
-  background: var(--background-secondary);
-  border-radius: 8px;
-  margin: 16px 0;
-}
-
-.vmemo-progress-bar {
-  height: 8px;
-  background: var(--background-modifier-border);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.vmemo-progress-bar-fill {
-  height: 100%;
-  background: var(--interactive-accent);
-  transition: width 0.3s ease;
-}
-
-.vmemo-progress-text {
-  font-size: 0.9em;
-  color: var(--text-muted);
-  text-align: center;
 }
 
 .vmemo-template-list {
@@ -136,7 +240,7 @@
 
 .vmemo-error {
   padding: 16px;
-  background: var(--background-modifier-error);
+  background: rgba(var(--color-red-rgb), 0.1);
   border-radius: 8px;
   color: var(--text-error);
   margin: 16px 0;
@@ -144,7 +248,7 @@
 
 .vmemo-success {
   padding: 16px;
-  background: var(--background-modifier-success);
+  background: rgba(var(--color-green-rgb), 0.1);
   border-radius: 8px;
   color: var(--text-success);
   margin: 16px 0;

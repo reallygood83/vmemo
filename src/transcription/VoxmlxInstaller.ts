@@ -38,41 +38,54 @@ export class VoxmlxInstaller {
   }
 
   private async checkPython(): Promise<void> {
-    try {
-      const { stdout } = await execAsync('python3 --version');
-      const version = stdout.match(/Python (\d+)\.(\d+)/);
-      
-      if (!version) {
-        throw new Error(ERROR_MESSAGES.pythonNotFound);
+    const pythonCommands = ['python3.11', 'python3', 'python'];
+    
+    for (const cmd of pythonCommands) {
+      try {
+        const { stdout } = await execAsync(`${cmd} --version`);
+        const version = stdout.match(/Python (\d+)\.(\d+)/);
+        
+        if (version) {
+          const major = parseInt(version[1]);
+          const minor = parseInt(version[2]);
+          
+          if (major >= 3 && minor >= 8) {
+            return;
+          }
+        }
+      } catch {
+        continue;
       }
-
-      const major = parseInt(version[1]);
-      const minor = parseInt(version[2]);
-
-      if (major < 3 || (major === 3 && minor < 11)) {
-        throw new Error('Python 3.11+ is required for voxmlx');
-      }
-    } catch (error) {
-      if (error instanceof Error && error.message.includes('Python')) {
-        throw error;
-      }
-      throw new Error(ERROR_MESSAGES.pythonNotFound);
     }
+    
+    throw new Error('Python 3.8+ is required. Please install Python from python.org');
   }
 
   private async installVoxmlx(): Promise<void> {
-    const { stdout, stderr } = await execAsync(TRANSCRIPTION_CONFIG.installCommand, {
-      timeout: 300000, // 5 minute timeout
-    });
+    const installCommands = [
+      'pipx install voxmlx --python python3.11',
+      'pipx install voxmlx --python python3',
+      'pip3 install voxmlx',
+      'pip install voxmlx',
+    ];
 
-    if (stderr && !stderr.includes('Successfully installed') && !stderr.includes('already installed')) {
-      console.warn('voxmlx install stderr:', stderr);
+    let lastError: Error | null = null;
+
+    for (const cmd of installCommands) {
+      try {
+        await execAsync(cmd, { timeout: 300000 });
+        
+        const isNowInstalled = await this.checkInstallation();
+        if (isNowInstalled) {
+          return;
+        }
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        continue;
+      }
     }
 
-    const isNowInstalled = await this.checkInstallation();
-    if (!isNowInstalled) {
-      throw new Error(ERROR_MESSAGES.voxmlxInstallFailed);
-    }
+    throw lastError || new Error(ERROR_MESSAGES.voxmlxInstallFailed);
   }
 
   async getVersion(): Promise<string | null> {

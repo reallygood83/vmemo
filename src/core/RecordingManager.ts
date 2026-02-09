@@ -4,6 +4,7 @@ import { AudioRecorder } from './AudioRecorder';
 import { TranscriptionService } from '../transcription/TranscriptionService';
 import { AIFormatterService } from '../ai/AIFormatterService';
 import { TemplateEngine } from '../templates/TemplateEngine';
+import { ProcessingModal } from '../ui/modals/ProcessingModal';
 import { RecordingState, TranscriptionResult, FormattedDocument } from '../types';
 import { UI_CONSTANTS } from '../constants';
 
@@ -14,7 +15,8 @@ export class RecordingManager {
   private aiFormatter: AIFormatterService;
   private templateEngine: TemplateEngine;
   private state: RecordingState;
-  private timerInterval: NodeJS.Timeout | null = null;
+  private timerInterval: ReturnType<typeof setInterval> | null = null;
+  private modal: ProcessingModal | null = null;
 
   constructor(plugin: VMemoPlugin) {
     this.plugin = plugin;
@@ -49,9 +51,13 @@ export class RecordingManager {
       startTime: Date.now(),
     };
 
+    this.modal = new ProcessingModal(this.plugin.app);
+    this.modal.onStopRecording = () => this.stopRecording();
+    this.modal.open();
+    this.modal.startRecording();
+
     this.startTimer();
     this.plugin.ribbonIcon.setRecording(true);
-    this.plugin.notify('Recording started');
   }
 
   async stopRecording(): Promise<void> {
@@ -63,17 +69,23 @@ export class RecordingManager {
     this.plugin.ribbonIcon.setRecording(false);
     this.plugin.statusBar.hide();
 
+    if (this.modal) {
+      this.modal.setStage('saving', 'Saving audio file...');
+    }
+
     const audioBlob = await this.recorder.stop();
     this.state.audioBlob = audioBlob;
     this.state.status = 'processing';
-
-    this.plugin.notify('Processing recording...');
 
     try {
       await this.processRecording(audioBlob);
     } catch (error) {
       this.state.status = 'error';
       this.state.error = error instanceof Error ? error.message : 'Unknown error';
+      
+      if (this.modal) {
+        this.modal.setError(this.state.error);
+      }
       throw error;
     }
   }
@@ -96,12 +108,17 @@ export class RecordingManager {
           return;
         }
 
-        this.plugin.notify('Processing uploaded file...');
+        this.modal = new ProcessingModal(this.plugin.app);
+        this.modal.open();
+        this.modal.setStage('saving', 'Processing uploaded file...');
 
         try {
           await this.processRecording(file);
           resolve();
         } catch (error) {
+          if (this.modal) {
+            this.modal.setError(error instanceof Error ? error.message : 'Unknown error');
+          }
           reject(error);
         }
       };
@@ -123,7 +140,9 @@ export class RecordingManager {
     this.state.audioPath = audioPath;
 
     this.state.status = 'transcribing';
-    this.plugin.notify('Transcribing audio...');
+    if (this.modal) {
+      this.modal.setStage('transcribing', 'Converting speech to text with voxmlx...');
+    }
     
     const transcription = await this.transcriptionService.transcribe(audioPath);
 
@@ -132,7 +151,9 @@ export class RecordingManager {
 
     if (this.plugin.settings.autoFormat) {
       this.state.status = 'formatting';
-      this.plugin.notify('Formatting with AI...');
+      if (this.modal) {
+        this.modal.setStage('formatting', 'Formatting transcript with AI...');
+      }
       formattedDoc = await this.aiFormatter.format(transcription.text, this.plugin.settings.defaultTemplate);
       formattedContent = formattedDoc.content;
     } else {
@@ -156,6 +177,10 @@ export class RecordingManager {
 
     const transcriptPath = await this.saveTranscript(finalDocument);
     this.state.status = 'complete';
+
+    if (this.modal) {
+      this.modal.setStage('complete', `Saved to ${transcriptPath}`);
+    }
 
     this.plugin.notify(`Transcript saved: ${transcriptPath}`);
     this.state = this.getInitialState();
