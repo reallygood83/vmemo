@@ -1,6 +1,6 @@
 {
   "name": "vmemo",
-  "version": "1.4.4",
+  "version": "1.4.5",
   "description": "Voice recording, transcription, and AI-powered document formatting for Obsidian",
   "main": "main.js",
   "scripts": {

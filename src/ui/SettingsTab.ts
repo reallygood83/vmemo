@@ -10,6 +10,7 @@ const execAsync = promisify(exec);
 export class VMemoSettingsTab extends PluginSettingTab {
   plugin: VMemoPlugin;
   private voxmlxStatusEl: HTMLElement | null = null;
+  private ffmpegStatusEl: HTMLElement | null = null;
 
   constructor(app: App, plugin: VMemoPlugin) {
     super(app, plugin);
@@ -22,7 +23,7 @@ export class VMemoSettingsTab extends PluginSettingTab {
 
     containerEl.createEl('h1', { text: 'VMemo Settings' });
 
-    this.addVoxmlxSection(containerEl);
+    this.addRequiredToolsSection(containerEl);
     this.addStorageSettings(containerEl);
     this.addTranscriptionSettings(containerEl);
     this.addAISettings(containerEl);
@@ -30,8 +31,15 @@ export class VMemoSettingsTab extends PluginSettingTab {
     this.addAdvancedSettings(containerEl);
   }
 
-  private async addVoxmlxSection(containerEl: HTMLElement): Promise<void> {
-    containerEl.createEl('h2', { text: 'Transcription Engine (voxmlx)' });
+  private async addRequiredToolsSection(containerEl: HTMLElement): Promise<void> {
+    containerEl.createEl('h2', { text: 'Required Tools' });
+    
+    await this.addVoxmlxSubsection(containerEl);
+    await this.addFfmpegSubsection(containerEl);
+  }
+
+  private async addVoxmlxSubsection(containerEl: HTMLElement): Promise<void> {
+    containerEl.createEl('h3', { text: '1. voxmlx (Transcription Engine)' });
 
     const statusContainer = containerEl.createDiv({ cls: 'vmemo-voxmlx-status' });
     this.voxmlxStatusEl = statusContainer.createDiv({ cls: 'vmemo-status-text' });
@@ -42,7 +50,7 @@ export class VMemoSettingsTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Install voxmlx')
-      .setDesc('One-click install via Terminal (auto-runs the command)')
+      .setDesc('Local speech-to-text using Voxtral Mini (Apple Silicon)')
       .addButton(button => button
         .setButtonText('Install Now')
         .setCta()
@@ -60,28 +68,67 @@ export class VMemoSettingsTab extends PluginSettingTab {
           await this.checkVoxmlxStatus();
           new Notice(await this.verifyVoxmlxInstalled() ? 'voxmlx is installed!' : 'voxmlx not found');
         }));
+  }
 
-    const infoEl = containerEl.createDiv({ cls: 'vmemo-manual-install' });
-    infoEl.createEl('p', { 
-      text: 'Requirements: macOS with Apple Silicon (M1/M2/M3/M4)',
-      cls: 'vmemo-manual-label'
-    });
-    
-    infoEl.createEl('p', { text: 'Install command:', cls: 'vmemo-manual-label' });
-    infoEl.createEl('code', { text: installCmd, cls: 'vmemo-manual-command' });
-    
-    const copyBtn = infoEl.createEl('button', { text: 'Copy', cls: 'vmemo-copy-btn' });
-    copyBtn.onclick = () => {
-      navigator.clipboard.writeText(installCmd);
-      new Notice('Copied!');
-      copyBtn.textContent = 'Copied!';
-      setTimeout(() => copyBtn.textContent = 'Copy', 2000);
-    };
+  private async addFfmpegSubsection(containerEl: HTMLElement): Promise<void> {
+    containerEl.createEl('h3', { text: '2. ffmpeg (Audio Converter)' });
 
-    infoEl.createEl('p', { 
-      text: 'If pipx is not installed: brew install pipx',
-      cls: 'vmemo-manual-label vmemo-hint'
-    });
+    const statusContainer = containerEl.createDiv({ cls: 'vmemo-ffmpeg-status' });
+    this.ffmpegStatusEl = statusContainer.createDiv({ cls: 'vmemo-status-text' });
+    
+    await this.checkFfmpegStatus();
+
+    const installCmd = 'brew install ffmpeg';
+
+    new Setting(containerEl)
+      .setName('Install ffmpeg')
+      .setDesc('Converts browser audio (WebM) to WAV for transcription')
+      .addButton(button => button
+        .setButtonText('Install Now')
+        .setCta()
+        .onClick(async () => {
+          new Notice('Opening Terminal and running install command...', 3000);
+          const script = `tell application "Terminal"
+            activate
+            do script "${installCmd}"
+          end tell`;
+          await execAsync(`osascript -e '${script}'`);
+        }))
+      .addButton(button => button
+        .setButtonText('Check Status')
+        .onClick(async () => {
+          await this.checkFfmpegStatus();
+          new Notice(await this.verifyFfmpegInstalled() ? 'ffmpeg is installed!' : 'ffmpeg not found');
+        }));
+  }
+
+  private async checkFfmpegStatus(): Promise<void> {
+    if (!this.ffmpegStatusEl) return;
+
+    const isInstalled = await this.verifyFfmpegInstalled();
+    if (isInstalled) {
+      this.ffmpegStatusEl.innerHTML = '<span class="vmemo-status-ok">✅ Installed</span>';
+    } else {
+      this.ffmpegStatusEl.innerHTML = '<span class="vmemo-status-error">❌ Not installed</span>';
+    }
+  }
+
+  private async verifyFfmpegInstalled(): Promise<boolean> {
+    const checkPaths = [
+      'ffmpeg -version',
+      '/opt/homebrew/bin/ffmpeg -version',
+      '/usr/local/bin/ffmpeg -version',
+    ];
+
+    for (const cmd of checkPaths) {
+      try {
+        await execAsync(cmd);
+        return true;
+      } catch {
+        continue;
+      }
+    }
+    return false;
   }
 
   private async checkVoxmlxStatus(): Promise<void> {
