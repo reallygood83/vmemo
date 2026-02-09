@@ -94,7 +94,7 @@ export const AUDIO_CONFIG = {
 
 export const TRANSCRIPTION_CONFIG = {
   voxmlxCommand: 'voxmlx',
-  checkCommand: 'voxmlx --version',
+  checkCommand: 'voxmlx --help',
   installCommand: 'pipx install voxmlx --python python3.11',
   pythonVersion: '3.11',
   supportedFormats: ['wav', 'mp3', 'm4a', 'flac', 'ogg', 'webm'],

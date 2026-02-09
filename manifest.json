@@ -1,7 +1,7 @@
 {
   "id": "vmemo",
   "name": "VMemo",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "minAppVersion": "1.4.0",
   "description": "Voice recording, transcription, and AI-powered document formatting for Obsidian. Record meetings and lectures, transcribe locally with voxmlx, and format with AI.",
   "author": "reallygood83",

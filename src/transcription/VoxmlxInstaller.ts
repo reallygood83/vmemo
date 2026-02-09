@@ -16,7 +16,7 @@ export class VoxmlxInstaller {
   async checkInstallation(): Promise<boolean> {
     try {
       const voxmlxPath = this.plugin.settings.voxmlxPath || TRANSCRIPTION_CONFIG.voxmlxCommand;
-      await execAsync(`${voxmlxPath} --version`);
+      await execAsync(`${voxmlxPath} --help`);
       return true;
     } catch {
       return false;
@@ -102,8 +102,8 @@ export class VoxmlxInstaller {
   async getVersion(): Promise<string | null> {
     try {
       const voxmlxPath = this.plugin.settings.voxmlxPath || TRANSCRIPTION_CONFIG.voxmlxCommand;
-      const { stdout } = await execAsync(`${voxmlxPath} --version`);
-      return stdout.trim();
+      await execAsync(`${voxmlxPath} --help`);
+      return 'installed';
     } catch {
       return null;
     }
