@@ -3,6 +3,7 @@ import { promisify } from 'util';
 import { Notice } from 'obsidian';
 import type VMemoPlugin from '../main';
 import { VoxmlxInstaller } from './VoxmlxInstaller';
+import { AudioConverter } from './AudioConverter';
 import { TranscriptionResult } from '../types';
 
 const execAsync = promisify(exec);
@@ -13,16 +14,26 @@ const EXTENDED_PATH = `/opt/homebrew/bin:/usr/local/bin:${HOME}/.local/bin:/usr/
 export class TranscriptionService {
   private plugin: VMemoPlugin;
   private installer: VoxmlxInstaller;
+  private converter: AudioConverter;
 
   constructor(plugin: VMemoPlugin) {
     this.plugin = plugin;
     this.installer = new VoxmlxInstaller(plugin);
+    this.converter = new AudioConverter();
   }
 
   async transcribe(audioPath: string): Promise<TranscriptionResult> {
     await this.ensureVoxmlxInstalled();
     
-    const absolutePath = this.getAbsolutePath(audioPath);
+    let finalAudioPath = audioPath;
+    
+    if (await this.converter.needsConversion(audioPath)) {
+      new Notice('Converting audio format for transcription...');
+      const basePath = this.getBasePath();
+      finalAudioPath = await this.converter.convertToWav(audioPath, basePath);
+    }
+    
+    const absolutePath = this.getAbsolutePath(finalAudioPath);
     const startTime = Date.now();
 
     try {
@@ -57,9 +68,12 @@ export class TranscriptionService {
     }
   }
 
+  private getBasePath(): string {
+    return (this.plugin.app.vault.adapter as any).getBasePath?.() || '';
+  }
+
   private getAbsolutePath(relativePath: string): string {
-    const basePath = (this.plugin.app.vault.adapter as any).getBasePath?.() || '';
-    return `${basePath}/${relativePath}`;
+    return `${this.getBasePath()}/${relativePath}`;
   }
 
   private async runVoxmlx(audioPath: string): Promise<VoxmlxOutput> {
