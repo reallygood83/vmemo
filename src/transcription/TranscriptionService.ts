@@ -26,11 +26,13 @@ export class TranscriptionService {
     await this.ensureVoxmlxInstalled();
     
     let finalAudioPath = audioPath;
+    let convertedFilePath: string | null = null;
     
     if (await this.converter.needsConversion(audioPath)) {
       new Notice('Converting audio format for transcription...');
       const basePath = this.getBasePath();
       finalAudioPath = await this.converter.convertToWav(audioPath, basePath);
+      convertedFilePath = finalAudioPath;
     }
     
     const absolutePath = this.getAbsolutePath(finalAudioPath);
@@ -39,6 +41,10 @@ export class TranscriptionService {
     try {
       const result = await this.runVoxmlx(absolutePath);
       const processingTime = Date.now() - startTime;
+
+      if (convertedFilePath) {
+        await this.deleteConvertedFile(convertedFilePath);
+      }
 
       return {
         text: result.text,
@@ -54,8 +60,22 @@ export class TranscriptionService {
         },
       };
     } catch (error) {
+      if (convertedFilePath) {
+        await this.deleteConvertedFile(convertedFilePath);
+      }
       const message = error instanceof Error ? error.message : 'Unknown error';
       throw new Error(`Transcription failed: ${message}`);
+    }
+  }
+
+  private async deleteConvertedFile(filePath: string): Promise<void> {
+    try {
+      const adapter = this.plugin.app.vault.adapter;
+      if (await adapter.exists(filePath)) {
+        await adapter.remove(filePath);
+      }
+    } catch (error) {
+      console.warn('Failed to delete converted file:', filePath, error);
     }
   }
 
