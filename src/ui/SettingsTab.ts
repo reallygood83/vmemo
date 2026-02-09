@@ -68,12 +68,17 @@ export class VMemoSettingsTab extends PluginSettingTab {
 
     const manualInstallEl = containerEl.createDiv({ cls: 'vmemo-manual-install' });
     manualInstallEl.createEl('p', { 
-      text: 'If automatic installation fails, run this command in Terminal:',
+      text: 'Requirements: macOS with Apple Silicon (M1/M2/M3/M4) + Python 3.10+',
+      cls: 'vmemo-manual-label'
+    });
+    manualInstallEl.createEl('p', { 
+      text: 'Manual installation (run in Terminal):',
       cls: 'vmemo-manual-label'
     });
     
-    const codeEl = manualInstallEl.createEl('code', { 
-      text: '/opt/homebrew/bin/python3 -m pip install voxmlx',
+    const pipxCmd = 'brew install pipx && pipx install voxmlx';
+    manualInstallEl.createEl('code', { 
+      text: pipxCmd,
       cls: 'vmemo-manual-command'
     });
     
@@ -82,7 +87,7 @@ export class VMemoSettingsTab extends PluginSettingTab {
       cls: 'vmemo-copy-btn'
     });
     copyBtn.onclick = () => {
-      navigator.clipboard.writeText('/opt/homebrew/bin/python3 -m pip install voxmlx');
+      navigator.clipboard.writeText(pipxCmd);
       new Notice('Command copied to clipboard!');
       copyBtn.textContent = 'Copied!';
       setTimeout(() => copyBtn.textContent = 'Copy', 2000);
@@ -92,28 +97,48 @@ export class VMemoSettingsTab extends PluginSettingTab {
   private async checkVoxmlxStatus(): Promise<void> {
     if (!this.voxmlxStatusEl) return;
 
-    try {
-      const { stdout } = await execAsync('voxmlx --version');
-      this.voxmlxStatusEl.innerHTML = `<span class="vmemo-status-ok">✅ Installed</span> <span class="vmemo-version">(${stdout.trim()})</span>`;
-    } catch {
+    const checkPaths = [
+      'voxmlx --version',
+      '~/.local/bin/voxmlx --version',
+      '/opt/homebrew/bin/voxmlx --version',
+    ];
+
+    for (const cmd of checkPaths) {
       try {
-        const { stdout } = await execAsync('~/.local/bin/voxmlx --version');
+        const { stdout } = await execAsync(cmd);
         this.voxmlxStatusEl.innerHTML = `<span class="vmemo-status-ok">✅ Installed</span> <span class="vmemo-version">(${stdout.trim()})</span>`;
+        return;
       } catch {
-        this.voxmlxStatusEl.innerHTML = '<span class="vmemo-status-error">❌ Not installed</span>';
+        continue;
       }
+    }
+
+    const sysCheck = await this.checkSystemRequirements();
+    if (!sysCheck.ok) {
+      this.voxmlxStatusEl.innerHTML = `<span class="vmemo-status-error">❌ ${sysCheck.error?.split('\n')[0] || 'System requirements not met'}</span>`;
+    } else {
+      this.voxmlxStatusEl.innerHTML = '<span class="vmemo-status-error">❌ Not installed</span>';
     }
   }
 
   private async installVoxmlx(): Promise<void> {
+    const sysCheck = await this.checkSystemRequirements();
+    if (!sysCheck.ok) {
+      throw new Error(sysCheck.error);
+    }
+
     new Notice('Installing voxmlx... This may take 1-2 minutes.');
 
+    const pythonPath = sysCheck.pythonPath;
     const installCommands = [
-      { cmd: '/opt/homebrew/bin/python3 -m pip install voxmlx --user --break-system-packages', desc: 'pip (user)' },
-      { cmd: '/opt/homebrew/bin/python3 -m pip install voxmlx --break-system-packages', desc: 'pip (system)' },
-      { cmd: '/usr/local/bin/python3 -m pip install voxmlx --user', desc: 'pip (local)' },
-      { cmd: 'python3 -m pip install voxmlx --user', desc: 'pip (default)' },
+      { cmd: `${pythonPath} -m pip install voxmlx --user --break-system-packages`, desc: 'pip (user + break-system)' },
+      { cmd: `${pythonPath} -m pip install voxmlx --user`, desc: 'pip (user)' },
+      { cmd: `${pythonPath} -m pip install voxmlx --break-system-packages`, desc: 'pip (system)' },
+      { cmd: `${pythonPath} -m pip install voxmlx`, desc: 'pip (default)' },
+      { cmd: 'pipx install voxmlx', desc: 'pipx' },
     ];
+
+    const errors: string[] = [];
 
     for (const { cmd, desc } of installCommands) {
       try {
@@ -122,26 +147,97 @@ export class VMemoSettingsTab extends PluginSettingTab {
         
         await new Promise(resolve => setTimeout(resolve, 2000));
         
-        try {
-          await execAsync('voxmlx --version');
+        if (await this.verifyVoxmlxInstalled()) {
           new Notice('voxmlx installed successfully!');
           return;
-        } catch {
-          try {
-            await execAsync('~/.local/bin/voxmlx --version');
-            new Notice('voxmlx installed successfully!');
-            return;
-          } catch {
-            continue;
-          }
         }
       } catch (error) {
-        console.log(`VMemo: ${desc} failed:`, error);
+        const msg = error instanceof Error ? error.message : String(error);
+        console.log(`VMemo: ${desc} failed:`, msg);
+        
+        if (msg.includes('No matching distribution') || msg.includes('from versions: none')) {
+          errors.push(`${desc}: Package not found for this Python version/platform`);
+        } else if (msg.includes('externally-managed-environment')) {
+          errors.push(`${desc}: System Python restrictions (try pipx)`);
+        } else {
+          errors.push(`${desc}: ${msg.slice(0, 100)}`);
+        }
         continue;
       }
     }
 
-    throw new Error('All installation methods failed. Please install manually.');
+    const errorDetails = errors.slice(0, 3).join('\n');
+    throw new Error(`Installation failed.\n\nRequirements:\n• macOS with Apple Silicon (M1/M2/M3/M4)\n• Python 3.10 or higher\n\nDetected: Python ${sysCheck.version} at ${pythonPath}\n\nTry manually:\n${pythonPath} -m pip install voxmlx --user\n\nErrors:\n${errorDetails}`);
+  }
+
+  private async checkSystemRequirements(): Promise<{ ok: boolean; pythonPath: string; version: string; error?: string }> {
+    try {
+      const { stdout: arch } = await execAsync('uname -m');
+      if (!arch.trim().includes('arm64')) {
+        return { 
+          ok: false, 
+          pythonPath: '', 
+          version: '',
+          error: 'voxmlx requires Apple Silicon (M1/M2/M3/M4).\nYour Mac appears to be Intel-based.\n\nAlternative: Use cloud transcription services instead.'
+        };
+      }
+    } catch {
+    }
+
+    const pythonPaths = [
+      '/opt/homebrew/bin/python3',
+      '/opt/homebrew/bin/python3.12',
+      '/opt/homebrew/bin/python3.11',
+      '/opt/homebrew/bin/python3.10',
+      '/usr/local/bin/python3',
+      'python3',
+    ];
+
+    for (const pythonPath of pythonPaths) {
+      try {
+        const { stdout } = await execAsync(`${pythonPath} --version`);
+        const versionMatch = stdout.match(/Python (\d+)\.(\d+)/);
+        if (versionMatch) {
+          const major = parseInt(versionMatch[1]);
+          const minor = parseInt(versionMatch[2]);
+          const version = `${major}.${minor}`;
+          
+          if (major >= 3 && minor >= 10) {
+            console.log(`VMemo: Found suitable Python: ${pythonPath} (${version})`);
+            return { ok: true, pythonPath, version };
+          } else {
+            console.log(`VMemo: Python ${version} at ${pythonPath} is too old (need >=3.10)`);
+          }
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    return {
+      ok: false,
+      pythonPath: '',
+      version: '',
+      error: 'No suitable Python found.\n\nvoxmlx requires Python 3.10 or higher.\n\nInstall with Homebrew:\nbrew install python@3.12\n\nThen try again.'
+    };
+  }
+
+  private async verifyVoxmlxInstalled(): Promise<boolean> {
+    const checkPaths = [
+      'voxmlx --version',
+      '~/.local/bin/voxmlx --version',
+      '/opt/homebrew/bin/voxmlx --version',
+    ];
+
+    for (const cmd of checkPaths) {
+      try {
+        await execAsync(cmd);
+        return true;
+      } catch {
+        continue;
+      }
+    }
+    return false;
   }
 
   private addStorageSettings(containerEl: HTMLElement): void {
