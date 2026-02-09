@@ -42,14 +42,17 @@ export class VMemoSettingsTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Install voxmlx')
-      .setDesc('Opens Terminal and copies install command to clipboard')
+      .setDesc('One-click install via Terminal (auto-runs the command)')
       .addButton(button => button
-        .setButtonText('Open Terminal')
+        .setButtonText('Install Now')
         .setCta()
         .onClick(async () => {
-          await navigator.clipboard.writeText(installCmd);
-          new Notice('Command copied! Paste (⌘V) in Terminal and press Enter.', 5000);
-          await execAsync('open -a Terminal');
+          new Notice('Opening Terminal and running install command...', 3000);
+          const script = `tell application "Terminal"
+            activate
+            do script "${installCmd}"
+          end tell`;
+          await execAsync(`osascript -e '${script}'`);
         }))
       .addButton(button => button
         .setButtonText('Check Status')
@@ -85,15 +88,15 @@ export class VMemoSettingsTab extends PluginSettingTab {
     if (!this.voxmlxStatusEl) return;
 
     const checkPaths = [
-      'voxmlx --version',
-      '~/.local/bin/voxmlx --version',
-      '/opt/homebrew/bin/voxmlx --version',
+      'voxmlx --help',
+      '~/.local/bin/voxmlx --help',
+      '/opt/homebrew/bin/voxmlx --help',
     ];
 
     for (const cmd of checkPaths) {
       try {
-        const { stdout } = await execAsync(cmd);
-        this.voxmlxStatusEl.innerHTML = `<span class="vmemo-status-ok">✅ Installed</span> <span class="vmemo-version">(${stdout.trim()})</span>`;
+        await execAsync(cmd);
+        this.voxmlxStatusEl.innerHTML = '<span class="vmemo-status-ok">✅ Installed</span>';
         return;
       } catch {
         continue;
@@ -225,9 +228,9 @@ export class VMemoSettingsTab extends PluginSettingTab {
 
   private async verifyVoxmlxInstalled(): Promise<boolean> {
     const checkPaths = [
-      'voxmlx --version',
-      '~/.local/bin/voxmlx --version',
-      '/opt/homebrew/bin/voxmlx --version',
+      'voxmlx --help',
+      '~/.local/bin/voxmlx --help',
+      '/opt/homebrew/bin/voxmlx --help',
     ];
 
     for (const cmd of checkPaths) {
