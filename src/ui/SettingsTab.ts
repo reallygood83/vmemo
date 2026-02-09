@@ -38,60 +38,47 @@ export class VMemoSettingsTab extends PluginSettingTab {
     
     await this.checkVoxmlxStatus();
 
+    const installCmd = 'pipx install voxmlx';
+
     new Setting(containerEl)
       .setName('Install voxmlx')
-      .setDesc('One-click installation of voxmlx transcription engine')
+      .setDesc('Opens Terminal and copies install command to clipboard')
       .addButton(button => button
-        .setButtonText('Install voxmlx')
+        .setButtonText('Open Terminal')
         .setCta()
         .onClick(async () => {
-          button.setDisabled(true);
-          button.setButtonText('Installing...');
-          
-          try {
-            await this.installVoxmlx();
-            button.setButtonText('Installed!');
-            await this.checkVoxmlxStatus();
-          } catch (error) {
-            button.setButtonText('Install voxmlx');
-            const msg = error instanceof Error ? error.message : 'Unknown error';
-            new Notice(`Installation failed: ${msg}`, 10000);
-          } finally {
-            button.setDisabled(false);
-          }
+          await navigator.clipboard.writeText(installCmd);
+          new Notice('Command copied! Paste (⌘V) in Terminal and press Enter.', 5000);
+          await execAsync('open -a Terminal');
         }))
       .addButton(button => button
         .setButtonText('Check Status')
         .onClick(async () => {
           await this.checkVoxmlxStatus();
+          new Notice(await this.verifyVoxmlxInstalled() ? 'voxmlx is installed!' : 'voxmlx not found');
         }));
 
-    const manualInstallEl = containerEl.createDiv({ cls: 'vmemo-manual-install' });
-    manualInstallEl.createEl('p', { 
-      text: 'Requirements: macOS with Apple Silicon (M1/M2/M3/M4) + Python 3.10+',
-      cls: 'vmemo-manual-label'
-    });
-    manualInstallEl.createEl('p', { 
-      text: 'Manual installation (run in Terminal):',
+    const infoEl = containerEl.createDiv({ cls: 'vmemo-manual-install' });
+    infoEl.createEl('p', { 
+      text: 'Requirements: macOS with Apple Silicon (M1/M2/M3/M4)',
       cls: 'vmemo-manual-label'
     });
     
-    const pipxCmd = 'brew install pipx && pipx install voxmlx';
-    manualInstallEl.createEl('code', { 
-      text: pipxCmd,
-      cls: 'vmemo-manual-command'
-    });
+    infoEl.createEl('p', { text: 'Install command:', cls: 'vmemo-manual-label' });
+    infoEl.createEl('code', { text: installCmd, cls: 'vmemo-manual-command' });
     
-    const copyBtn = manualInstallEl.createEl('button', {
-      text: 'Copy',
-      cls: 'vmemo-copy-btn'
-    });
+    const copyBtn = infoEl.createEl('button', { text: 'Copy', cls: 'vmemo-copy-btn' });
     copyBtn.onclick = () => {
-      navigator.clipboard.writeText(pipxCmd);
-      new Notice('Command copied to clipboard!');
+      navigator.clipboard.writeText(installCmd);
+      new Notice('Copied!');
       copyBtn.textContent = 'Copied!';
       setTimeout(() => copyBtn.textContent = 'Copy', 2000);
     };
+
+    infoEl.createEl('p', { 
+      text: 'If pipx is not installed: brew install pipx',
+      cls: 'vmemo-manual-label vmemo-hint'
+    });
   }
 
   private async checkVoxmlxStatus(): Promise<void> {
