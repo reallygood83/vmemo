@@ -130,12 +130,17 @@ export class VMemoSettingsTab extends PluginSettingTab {
     new Notice('Installing voxmlx... This may take 1-2 minutes.');
 
     const pythonPath = sysCheck.pythonPath;
+    const homeDir = process.env.HOME || '/Users/' + process.env.USER;
+    const envPath = `/opt/homebrew/bin:/usr/local/bin:${homeDir}/.local/bin:/usr/bin:/bin`;
+    const execOptions = { 
+      timeout: 300000,
+      env: { ...process.env, PATH: envPath }
+    };
+
     const installCommands = [
-      { cmd: `${pythonPath} -m pip install voxmlx --user --break-system-packages`, desc: 'pip (user + break-system)' },
-      { cmd: `${pythonPath} -m pip install voxmlx --user`, desc: 'pip (user)' },
+      { cmd: `/opt/homebrew/bin/pipx install voxmlx`, desc: 'pipx (homebrew)' },
+      { cmd: `${pythonPath} -m pip install voxmlx --user --break-system-packages`, desc: 'pip (break-system)' },
       { cmd: `${pythonPath} -m pip install voxmlx --break-system-packages`, desc: 'pip (system)' },
-      { cmd: `${pythonPath} -m pip install voxmlx`, desc: 'pip (default)' },
-      { cmd: 'pipx install voxmlx', desc: 'pipx' },
     ];
 
     const errors: string[] = [];
@@ -143,7 +148,7 @@ export class VMemoSettingsTab extends PluginSettingTab {
     for (const { cmd, desc } of installCommands) {
       try {
         console.log(`VMemo: Trying ${desc}: ${cmd}`);
-        await execAsync(cmd, { timeout: 300000 });
+        await execAsync(cmd, execOptions);
         
         await new Promise(resolve => setTimeout(resolve, 2000));
         
@@ -156,18 +161,27 @@ export class VMemoSettingsTab extends PluginSettingTab {
         console.log(`VMemo: ${desc} failed:`, msg);
         
         if (msg.includes('No matching distribution') || msg.includes('from versions: none')) {
-          errors.push(`${desc}: Package not found for this Python version/platform`);
+          errors.push(`${desc}: Package not found`);
         } else if (msg.includes('externally-managed-environment')) {
-          errors.push(`${desc}: System Python restrictions (try pipx)`);
+          errors.push(`${desc}: System Python restrictions`);
+        } else if (msg.includes('command not found') || msg.includes('No such file')) {
+          errors.push(`${desc}: Not installed`);
         } else {
-          errors.push(`${desc}: ${msg.slice(0, 100)}`);
+          errors.push(`${desc}: ${msg.slice(0, 80)}`);
         }
         continue;
       }
     }
 
-    const errorDetails = errors.slice(0, 3).join('\n');
-    throw new Error(`Installation failed.\n\nRequirements:\n• macOS with Apple Silicon (M1/M2/M3/M4)\n• Python 3.10 or higher\n\nDetected: Python ${sysCheck.version} at ${pythonPath}\n\nTry manually:\n${pythonPath} -m pip install voxmlx --user\n\nErrors:\n${errorDetails}`);
+    const errorDetails = errors.join('\n');
+    const hasPipxError = errors.some(e => e.includes('pipx') && e.includes('Not installed'));
+    
+    let manualCmd = `${pythonPath} -m pip install voxmlx --break-system-packages`;
+    if (hasPipxError) {
+      manualCmd = 'brew install pipx && pipx install voxmlx';
+    }
+    
+    throw new Error(`Installation failed.\n\nRequirements:\n• macOS with Apple Silicon (M1/M2/M3/M4)\n• Python 3.10+ (Detected: ${sysCheck.version})\n• pipx (recommended)\n\nRun in Terminal:\n${manualCmd}\n\nErrors:\n${errorDetails}`);
   }
 
   private async checkSystemRequirements(): Promise<{ ok: boolean; pythonPath: string; version: string; error?: string }> {
