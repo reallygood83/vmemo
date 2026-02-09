@@ -1,0 +1,151 @@
+.vmemo-ribbon-icon {
+  cursor: pointer;
+}
+
+.vmemo-ribbon-icon.vmemo-recording {
+  color: var(--text-error);
+  animation: vmemo-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes vmemo-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.vmemo-status-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  font-weight: 500;
+}
+
+.vmemo-status-bar.recording {
+  color: var(--text-error);
+}
+
+.vmemo-settings h1 {
+  margin-bottom: 24px;
+}
+
+.vmemo-settings h2 {
+  margin-top: 32px;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.vmemo-settings h3 {
+  margin-top: 16px;
+  margin-bottom: 12px;
+  font-size: 0.95em;
+  color: var(--text-muted);
+}
+
+.vmemo-modal {
+  max-width: 600px;
+}
+
+.vmemo-modal .modal-content {
+  padding: 20px;
+}
+
+.vmemo-progress-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  background: var(--background-secondary);
+  border-radius: 8px;
+  margin: 16px 0;
+}
+
+.vmemo-progress-bar {
+  height: 8px;
+  background: var(--background-modifier-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.vmemo-progress-bar-fill {
+  height: 100%;
+  background: var(--interactive-accent);
+  transition: width 0.3s ease;
+}
+
+.vmemo-progress-text {
+  font-size: 0.9em;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.vmemo-template-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.vmemo-template-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--background-secondary);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.vmemo-template-item:hover {
+  background: var(--background-secondary-alt);
+}
+
+.vmemo-template-item.selected {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.vmemo-template-icon {
+  font-size: 1.5em;
+}
+
+.vmemo-template-info {
+  flex: 1;
+}
+
+.vmemo-template-name {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.vmemo-template-description {
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+
+.vmemo-template-item.selected .vmemo-template-description {
+  color: var(--text-on-accent);
+  opacity: 0.8;
+}
+
+.vmemo-error {
+  padding: 16px;
+  background: var(--background-modifier-error);
+  border-radius: 8px;
+  color: var(--text-error);
+  margin: 16px 0;
+}
+
+.vmemo-success {
+  padding: 16px;
+  background: var(--background-modifier-success);
+  border-radius: 8px;
+  color: var(--text-success);
+  margin: 16px 0;
+}
